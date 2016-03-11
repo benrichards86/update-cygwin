@@ -6,6 +6,7 @@ This script will download the installer binary and run it in a mode that does an
 Since the installer requires Administrator access, the script will elevate itself via UAC if required.
 
 In order to run it, you will need to enable running of local Powershell scripts on the machine. From an elevated Powershell prompt, type:
-> Set-ExecutionPolicy RemoteSigned
+
+&gt; Set-ExecutionPolicy RemoteSigned
 
 Answer Yes to the prompt. Then you can run this tool.
