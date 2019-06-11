@@ -1,8 +1,8 @@
-# Parameters
 param (
-   [switch]$32bit = $false,
-   [switch]$nocleanup = $false,
-   [switch]$interactive = $false
+   [Parameter(Mandatory = $false, HelpMessage = "Run the 32-bit version of the Cygwin installer.")]
+   [switch]$do32bit,
+   [Parameter(Mandatory = $false, HelpMessage = "Run the installer interactively, allowing you to manually select packages to install, remove, or upgrade.")]
+   [switch]$editpkgs
 )
 
 # Get the ID and security principal of the current user account
@@ -23,38 +23,37 @@ else {
    # We are not running "as Administrator" - so relaunch as administrator
    
    # Create a new process object that starts PowerShell
-   $newProcess = new-object System.Diagnostics.ProcessStartInfo "PowerShell"
+   $newProcess = new-object System.Diagnostics.ProcessStartInfo "PowerShell";
    
    # Specify the current script path and name as a parameter
    $newProcess.Arguments = $myInvocation.MyCommand.Definition
-   if ($32bit) {
-      $newProcess.Arguments += " -32bit"
+   if ($do32bit) {
+      $newProcess.Arguments += " -do32bit"
    }
-   if ($nocleanup) {
-      $newProcess.Arguments += " -nocleanup"
+   if ($editpkgs) {
+      $newProcess.Arguments += " -editpkgs"
    }
-   if ($interactive) {
-      $newProcess.Arguments += " -interactive"
-   }
+
+   write-host $newprocess.arguments
    
    # Indicate that the process should be elevated
-   $newProcess.Verb = "runas"
+   $newProcess.Verb = "runas";
    
    # Start the new process
-   [System.Diagnostics.Process]::Start($newProcess)
+   [System.Diagnostics.Process]::Start($newProcess);
    
    # Exit from the current, unelevated, process
    exit
 }
 
 # Run your code that needs to be elevated here
-if ($32bit) {
-    $file = "http://cygwin.com/setup-x86.exe"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+if (!$do32bit) {
+   (new-object System.Net.WebClient).DownloadFile('https://www.cygwin.com/setup-x86_64.exe', $ENV:Temp + '\cygwin-setup.exe')
 }
 else {
-    $file = "http://cygwin.com/setup-x86_64.exe"
+   (new-object System.Net.WebClient).DownloadFile('https://www.cygwin.com/setup-x86.exe', $ENV:Temp + '\cygwin-setup.exe')
 }
-(new-object System.Net.WebClient).DownloadFile($file,'cyg_setup.exe')
 
 if (!$?) {
    Write-Host "Something wrong happened when downloading the Cygwin installer."
@@ -63,25 +62,20 @@ if (!$?) {
    exit
 }
 
-$options = ""
-if (!$interactive) {
-    $options = "-g -q"
-}
+Write-Host "Running: $ENV:Temp\cygwin-setup.exe ..."
 
-if ($options -ne "") {
-    $p = Start-Process .\cyg_setup.exe -ArgumentList "$options" -wait -NoNewWindow -PassThru
+if ($editpkgs) {
+   $script:p = Start-Process $ENV:Temp\cygwin-setup.exe -ArgumentList "--upgrade-also" -wait -NoNewWindow -PassThru
 }
 else {
-    $p = Start-Process .\cyg_setup.exe -wait -NoNewWindow -PassThru
+   $script:p = Start-Process $ENV:Temp\cygwin-setup.exe -ArgumentList "--upgrade-also --quiet-mode" -wait -NoNewWindow -PassThru
 }
 
-if ($p.ExitCode -ne 0) {
-    Write-Host "Cygwin setup failed with an error!"
+if ($script:p.ExitCode -ne 0) {
+   Write-Host "Cygwin setup failed with an error!"
 }
 
-if (!$nocleanup) {
-    Remove-Item .\cyg_setup.exe
-}
+Remove-Item $ENV:Temp\cygwin-setup.exe
 
 Write-Host -NoNewLine "Press any key to continue..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
